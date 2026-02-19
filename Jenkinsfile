@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_IMAGE = 'node-demo'
+        DOCKER_IMAGE = '45.141.151.65/node-demo/node-demo'
         DOCKER_TAG = 'latest'
         CONTAINER_NAME = 'node-demo'
         CONTAINER_PORT = '3000:3000'
@@ -42,6 +42,11 @@ pipeline {
                 }
             }
         }
+	stage('Push to Harbor') {
+   	     steps {
+       		 sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
+    	}
+	}	
     }
     
     post {
