@@ -12,11 +12,14 @@ pipeline {
         githubPush()
     }
 
+    stages {
+
         stage('Build Docker Image') {
             steps {
                 sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
             }
         }
+
         stage('Run Container') {
             steps {
                 script {
@@ -27,6 +30,7 @@ pipeline {
                 }
             }
         }
+
     }
 
     post {
@@ -41,3 +45,4 @@ pipeline {
         }
     }
 }
+
