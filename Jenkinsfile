@@ -42,11 +42,19 @@ pipeline {
                 }
             }
         }
+	
 	stage('Push to Harbor') {
-   	     steps {
-       		 sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
-    	}
-	}	
+ 	   steps {
+        	withCredentials([usernamePassword(
+           		credentialsId: 'harbor-credentials',
+            		usernameVariable: 'HARBOR_USER',
+            		passwordVariable: 'HARBOR_PASS'
+        )]) {
+            		sh "docker login 45.141.151.65 -u ${HARBOR_USER} -p ${HARBOR_PASS}"
+            		sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
+        }
+    }
+}	
     }
     
     post {
