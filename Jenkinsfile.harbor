@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     environment {
-        HARBOR_URL = "harbor.example.com"
+        HARBOR_URL = "localhost"
         HARBOR_PROJECT = "devops"
         APP_NAME = "node-jenkins-demo"
         IMAGE = "${HARBOR_URL}/${HARBOR_PROJECT}/${APP_NAME}"
