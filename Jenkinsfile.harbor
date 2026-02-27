@@ -1,0 +1,36 @@
+pipeline {
+    agent any
+    
+    environment {
+        HARBOR_URL = "harbor.example.com"
+        HARBOR_PROJECT = "devops"
+        APP_NAME = "node-jenkins-demo"
+        IMAGE = "${HARBOR_URL}/${HARBOR_PROJECT}/${APP_NAME}"
+    }
+    
+    stages {
+        stage('Build') {
+            steps {
+                sh 'docker build -t ${IMAGE}:${BUILD_NUMBER} .'
+                sh 'docker tag ${IMAGE}:${BUILD_NUMBER} ${IMAGE}:latest'
+            }
+        }
+        
+        stage('Push to Harbor') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'harbor-credentials',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    sh '''
+                        echo $PASS | docker login -u $USER --password-stdin $HARBOR_URL
+                        docker push ${IMAGE}:${BUILD_NUMBER}
+                        docker push ${IMAGE}:latest
+                        docker logout $HARBOR_URL
+                    '''
+                }
+            }
+        }
+    }
+}
