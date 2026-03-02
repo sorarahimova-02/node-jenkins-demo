@@ -6,6 +6,7 @@ pipeline {
         HARBOR_PROJECT = "devops"
         APP_NAME = "node-jenkins-demo"
         IMAGE = "${HARBOR_URL}/${HARBOR_PROJECT}/${APP_NAME}"
+        CONTAINER_NAME = "node-app"
     }
     
     stages {
@@ -31,6 +32,47 @@ pipeline {
                     '''
                 }
             }
+        }
+        
+        stage('Deploy - Run Container') {
+            steps {
+                script {
+                    sh '''
+                        docker stop node-app || true
+                        docker rm node-app || true
+                        
+                        docker run -d \
+                          --name node-app \
+                          -p 3000:3000 \
+                          -e NODE_ENV=production \
+                          ${IMAGE}:latest
+                        
+                        echo "Container started:"
+                        docker ps | grep node-app
+                    '''
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                script {
+                    sh '''
+                        sleep 5
+                        curl -f http://localhost:3000/health || exit 1
+                        echo "✓ App is healthy!"
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "✓ SUCCESS - App running at http://localhost:3000"
+        }
+        failure {
+            sh 'docker stop node-app || true'
         }
     }
 }
