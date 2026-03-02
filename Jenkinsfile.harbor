@@ -12,6 +12,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
+                echo "Building Docker image..."
                 sh 'docker build -t ${IMAGE}:${BUILD_NUMBER} .'
                 sh 'docker tag ${IMAGE}:${BUILD_NUMBER} ${IMAGE}:latest'
             }
@@ -19,6 +20,7 @@ pipeline {
         
         stage('Push to Harbor') {
             steps {
+                echo "Pushing to Harbor..."
                 withCredentials([usernamePassword(
                     credentialsId: 'harbor-credentials',
                     usernameVariable: 'USER',
@@ -34,45 +36,64 @@ pipeline {
             }
         }
         
-        stage('Deploy - Run Container') {
+        stage('Pull from Harbor') {
             steps {
-                script {
+                echo "Pulling fresh image from Harbor..."
+                withCredentials([usernamePassword(
+                    credentialsId: 'harbor-credentials',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
                     sh '''
-                        docker stop node-app || true
-                        docker rm node-app || true
-                        
-                        docker run -d \
-                          --name node-app \
-                          -p 3000:3000 \
-                          -e NODE_ENV=production \
-                          ${IMAGE}:latest
-                        
-                        echo "Container started:"
-                        docker ps | grep node-app
+                        echo $PASS | docker login -u $USER --password-stdin $HARBOR_URL
+                        docker pull ${IMAGE}:latest
+                        docker logout $HARBOR_URL
                     '''
                 }
             }
         }
         
+        stage('Deploy - Run Container from Harbor') {
+            steps {
+                echo "Deploying container from Harbor image..."
+                sh '''
+                    docker stop ${CONTAINER_NAME} || true
+                    docker rm ${CONTAINER_NAME} || true
+                    
+                    docker run -d \
+                      --name ${CONTAINER_NAME} \
+                      -p 3000:3000 \
+                      -e NODE_ENV=production \
+                      -e VERSION=${BUILD_NUMBER} \
+                      ${IMAGE}:latest
+                    
+                    docker ps | grep ${CONTAINER_NAME}
+                '''
+            }
+        }
+        
         stage('Health Check') {
             steps {
-                script {
-                    sh '''
-                        sleep 5
-                        curl -f http://localhost:3000/health || exit 1
-                        echo "✓ App is healthy!"
-                    '''
-                }
+                echo "Checking app health..."
+                sh '''
+                    sleep 5
+                    curl -f http://localhost:3000/health || {
+                        echo "Health check FAILED!"
+                        docker logs ${CONTAINER_NAME}
+                        exit 1
+                    }
+                    echo "✓ App is healthy!"
+                '''
             }
         }
     }
     
     post {
         success {
-            echo "✓ SUCCESS - App running at http://localhost:3000"
+            sh 'echo "✓ App is running from Harbor image at http://localhost:3000"'
         }
         failure {
-            sh 'docker stop node-app || true'
+            sh 'docker stop ${CONTAINER_NAME} || true'
         }
     }
 }
